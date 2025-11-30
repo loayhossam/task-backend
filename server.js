@@ -1,10 +1,25 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
 const bodyParser = require('body-parser');
 
 const app = express();
-app.use(cors());
+
+// --- حل مشكلة CORS (يدوياً) ---
+app.use((req, res, next) => {
+    // السماح لأي موقع بالاتصال
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    // السماح بجميع الأوامر
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    // السماح بجميع الرؤوس
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // التعامل مع طلبات الفحص (Preflight)
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
 app.use(bodyParser.json());
 
 const MONGO_URI = process.env.MONGO_URI;
@@ -17,7 +32,7 @@ if (!MONGO_URI) {
         .catch(err => console.error('❌ DB Error:', err));
 }
 
-// 1. تعريف الجداول
+// --- الجداول ---
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -36,20 +51,21 @@ const TaskSchema = new mongoose.Schema({
 });
 const Task = mongoose.model('Task', TaskSchema);
 
-// 2. الروابط (APIs)
-app.get('/', (req, res) => res.send('Backend Updated v4 (Employees Ready) 🚀'));
+// --- الروابط ---
 
-// تسجيل الدخول
+app.get('/', (req, res) => res.send('Backend Working with CORS Fix 🚀'));
+
+// 1. تسجيل الدخول
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         const user = await User.findOne({ username, password });
         if (user) res.json({ success: true, user });
-        else res.status(401).json({ success: false, message: 'Wrong data' });
+        else res.status(401).json({ success: false, message: 'بيانات خطأ' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- أوامر التاسكات ---
+// 2. المهام
 app.get('/api/tasks', async (req, res) => {
     try {
         const tasks = await Task.find().sort({ createdAt: -1 });
@@ -72,9 +88,7 @@ app.put('/api/tasks/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- أوامر الموظفين (تأكد إن الجزء ده موجود) ---
-
-// 1. جلب الموظفين
+// 3. الموظفين
 app.get('/api/users', async (req, res) => {
     try {
         const users = await User.find();
@@ -82,7 +96,6 @@ app.get('/api/users', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 2. إضافة موظف
 app.post('/api/users', async (req, res) => {
     try {
         const existing = await User.findOne({ username: req.body.username });
@@ -94,7 +107,6 @@ app.post('/api/users', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 3. حذف موظف
 app.delete('/api/users/:id', async (req, res) => {
     try {
         await User.findByIdAndDelete(req.params.id);
@@ -102,7 +114,6 @@ app.delete('/api/users/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 4. تغيير باسورد
 app.put('/api/users/:id', async (req, res) => {
     try {
         await User.findByIdAndUpdate(req.params.id, { password: req.body.password });
@@ -110,7 +121,7 @@ app.put('/api/users/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Setup
+// 4. التفعيل
 app.get('/api/setup', async (req, res) => {
     try {
         const count = await User.countDocuments();
