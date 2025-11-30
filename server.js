@@ -37,7 +37,7 @@ const TaskSchema = new mongoose.Schema({
 const Task = mongoose.model('Task', TaskSchema);
 
 // 2. الروابط (APIs)
-app.get('/', (req, res) => res.send('Backend Updated v3 🚀'));
+app.get('/', (req, res) => res.send('Backend Updated v4 (Employees Ready) 🚀'));
 
 // تسجيل الدخول
 app.post('/api/login', async (req, res) => {
@@ -51,24 +51,30 @@ app.post('/api/login', async (req, res) => {
 
 // --- أوامر التاسكات ---
 app.get('/api/tasks', async (req, res) => {
-    const tasks = await Task.find().sort({ createdAt: -1 });
-    res.json(tasks);
+    try {
+        const tasks = await Task.find().sort({ createdAt: -1 });
+        res.json(tasks);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/tasks', async (req, res) => {
-    const newTask = new Task(req.body);
-    await newTask.save();
-    res.json(newTask);
+    try {
+        const newTask = new Task(req.body);
+        await newTask.save();
+        res.json(newTask);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.put('/api/tasks/:id', async (req, res) => {
-    await Task.findByIdAndUpdate(req.params.id, { status: req.body.status });
-    res.json({ success: true });
+    try {
+        await Task.findByIdAndUpdate(req.params.id, { status: req.body.status });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- أوامر الموظفين (الجزء اللي كان ناقصك) ---
+// --- أوامر الموظفين (تأكد إن الجزء ده موجود) ---
 
-// 1. جلب كل الموظفين
+// 1. جلب الموظفين
 app.get('/api/users', async (req, res) => {
     try {
         const users = await User.find();
@@ -76,48 +82,48 @@ app.get('/api/users', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 2. إضافة موظف جديد
+// 2. إضافة موظف
 app.post('/api/users', async (req, res) => {
     try {
-        // التأكد إن الاسم مش موجود
         const existing = await User.findOne({ username: req.body.username });
-        if (existing) {
-            return res.status(400).json({ error: 'Username exists' });
-        }
+        if (existing) return res.status(400).json({ error: 'Username exists' });
         
         const newUser = new User(req.body);
         await newUser.save();
         res.json({ success: true, user: newUser });
-    } catch (e) { 
-        res.status(500).json({ error: e.message }); 
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // 3. حذف موظف
 app.delete('/api/users/:id', async (req, res) => {
-    await User.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    try {
+        await User.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 4. تغيير الباسورد
+// 4. تغيير باسورد
 app.put('/api/users/:id', async (req, res) => {
-    await User.findByIdAndUpdate(req.params.id, { password: req.body.password });
-    res.json({ success: true });
+    try {
+        await User.findByIdAndUpdate(req.params.id, { password: req.body.password });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Setup
 app.get('/api/setup', async (req, res) => {
-    const count = await User.countDocuments();
-    if (count === 0) {
-        await User.create([
-            { username: 'admin', password: '123', name: 'المدير', role: 'admin' },
-            { username: 'user', password: '123', name: 'موظف', role: 'employee' }
-        ]);
-        res.send('Users Created!');
-    } else {
-        res.send('Users Exist');
-    }
+    try {
+        const count = await User.countDocuments();
+        if (count === 0) {
+            await User.create([
+                { username: 'admin', password: '123', name: 'المدير', role: 'admin' },
+                { username: 'user', password: '123', name: 'موظف', role: 'employee' }
+            ]);
+            res.send('Users Created!');
+        } else {
+            res.send('Users Exist');
+        }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// تصدير التطبيق لـ Vercel
 module.exports = app;
