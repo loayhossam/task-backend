@@ -17,7 +17,7 @@ if (!MONGO_URI) {
         .catch(err => console.error('❌ DB Error:', err));
 }
 
-// الجداول
+// 1. تعريف الجداول
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -28,7 +28,7 @@ const User = mongoose.model('User', UserSchema);
 
 const TaskSchema = new mongoose.Schema({
     title: String,
-    type: String, // design, video, other
+    type: String,
     status: { type: String, default: 'pending' },
     assignedTo: String,
     date: String,
@@ -36,21 +36,20 @@ const TaskSchema = new mongoose.Schema({
 });
 const Task = mongoose.model('Task', TaskSchema);
 
-// --- الروابط (APIs) ---
+// 2. الروابط (APIs)
+app.get('/', (req, res) => res.send('Backend Updated v3 🚀'));
 
-app.get('/', (req, res) => res.send('Backend Working v2'));
-
-// تسجيل دخول
+// تسجيل الدخول
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         const user = await User.findOne({ username, password });
         if (user) res.json({ success: true, user });
-        else res.status(401).json({ success: false, message: 'Wrong credentials' });
+        else res.status(401).json({ success: false, message: 'Wrong data' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// إدارة المهام
+// --- أوامر التاسكات ---
 app.get('/api/tasks', async (req, res) => {
     const tasks = await Task.find().sort({ createdAt: -1 });
     res.json(tasks);
@@ -67,37 +66,46 @@ app.put('/api/tasks/:id', async (req, res) => {
     res.json({ success: true });
 });
 
-// --- إدارة المستخدمين (جديد) ---
+// --- أوامر الموظفين (الجزء اللي كان ناقصك) ---
 
-// جلب كل الموظفين
+// 1. جلب كل الموظفين
 app.get('/api/users', async (req, res) => {
-    const users = await User.find();
-    res.json(users);
+    try {
+        const users = await User.find();
+        res.json(users);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// إضافة موظف جديد
+// 2. إضافة موظف جديد
 app.post('/api/users', async (req, res) => {
     try {
+        // التأكد إن الاسم مش موجود
+        const existing = await User.findOne({ username: req.body.username });
+        if (existing) {
+            return res.status(400).json({ error: 'Username exists' });
+        }
+        
         const newUser = new User(req.body);
         await newUser.save();
         res.json({ success: true, user: newUser });
-    } catch (e) { res.status(400).json({ error: 'Username exists' }); }
+    } catch (e) { 
+        res.status(500).json({ error: e.message }); 
+    }
 });
 
-// حذف موظف
+// 3. حذف موظف
 app.delete('/api/users/:id', async (req, res) => {
     await User.findByIdAndDelete(req.params.id);
     res.json({ success: true });
 });
 
-// تغيير الباسورد
+// 4. تغيير الباسورد
 app.put('/api/users/:id', async (req, res) => {
-    const { password } = req.body;
-    await User.findByIdAndUpdate(req.params.id, { password });
+    await User.findByIdAndUpdate(req.params.id, { password: req.body.password });
     res.json({ success: true });
 });
 
-// تفعيل النظام
+// Setup
 app.get('/api/setup', async (req, res) => {
     const count = await User.countDocuments();
     if (count === 0) {
@@ -111,4 +119,5 @@ app.get('/api/setup', async (req, res) => {
     }
 });
 
+// تصدير التطبيق لـ Vercel
 module.exports = app;
