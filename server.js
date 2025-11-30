@@ -4,35 +4,29 @@ const bodyParser = require('body-parser');
 
 const app = express();
 
-// --- حل مشكلة CORS (يدوياً) ---
+// --- 1. حل مشكلة CORS نهائياً (السماح للجميع) ---
 app.use((req, res, next) => {
-    // السماح لأي موقع بالاتصال
     res.setHeader('Access-Control-Allow-Origin', '*');
-    // السماح بجميع الأوامر
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    // السماح بجميع الرؤوس
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
-    // التعامل مع طلبات الفحص (Preflight)
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
 });
 
 app.use(bodyParser.json());
 
+// --- 2. الاتصال بقاعدة البيانات ---
 const MONGO_URI = process.env.MONGO_URI;
 
 if (!MONGO_URI) {
-    console.log("❌ Error: MONGO_URI missing");
+    console.error("❌ Fatal Error: MONGO_URI is missing from Environment Variables!");
 } else {
     mongoose.connect(MONGO_URI)
-        .then(() => console.log('✅ Connected to MongoDB'))
-        .catch(err => console.error('❌ DB Error:', err));
+        .then(() => console.log('✅ Connected to MongoDB Successfully'))
+        .catch(err => console.error('❌ MongoDB Connection Error:', err));
 }
 
-// --- الجداول ---
+// --- 3. تصميم الجداول (المحدث) ---
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -43,7 +37,8 @@ const User = mongoose.model('User', UserSchema);
 
 const TaskSchema = new mongoose.Schema({
     title: String,
-    type: String,
+    type: String, // design, video, code, other
+    priority: String, // high, medium, low (جديد)
     status: { type: String, default: 'pending' },
     assignedTo: String,
     date: String,
@@ -51,24 +46,24 @@ const TaskSchema = new mongoose.Schema({
 });
 const Task = mongoose.model('Task', TaskSchema);
 
-// --- الروابط ---
+// --- 4. الروابط (API Routes) ---
 
-app.get('/', (req, res) => res.send('Backend Working with CORS Fix 🚀'));
+app.get('/', (req, res) => res.send('🚀 Ultimate Task Manager Backend is Running!'));
 
-// 1. تسجيل الدخول
+// تسجيل الدخول
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         const user = await User.findOne({ username, password });
         if (user) res.json({ success: true, user });
-        else res.status(401).json({ success: false, message: 'بيانات خطأ' });
+        else res.status(401).json({ success: false, message: 'بيانات غير صحيحة' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 2. المهام
+// إدارة المهام
 app.get('/api/tasks', async (req, res) => {
     try {
-        const tasks = await Task.find().sort({ createdAt: -1 });
+        const tasks = await Task.find().sort({ priority: 1, createdAt: -1 }); // ترتيب بالأهمية
         res.json(tasks);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -88,7 +83,14 @@ app.put('/api/tasks/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 3. الموظفين
+app.delete('/api/tasks/:id', async (req, res) => { // (جديد) حذف المهمة
+    try {
+        await Task.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// إدارة الموظفين
 app.get('/api/users', async (req, res) => {
     try {
         const users = await User.find();
@@ -100,7 +102,6 @@ app.post('/api/users', async (req, res) => {
     try {
         const existing = await User.findOne({ username: req.body.username });
         if (existing) return res.status(400).json({ error: 'Username exists' });
-        
         const newUser = new User(req.body);
         await newUser.save();
         res.json({ success: true, user: newUser });
@@ -114,25 +115,18 @@ app.delete('/api/users/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.put('/api/users/:id', async (req, res) => {
-    try {
-        await User.findByIdAndUpdate(req.params.id, { password: req.body.password });
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// 4. التفعيل
+// التفعيل الأولي
 app.get('/api/setup', async (req, res) => {
     try {
         const count = await User.countDocuments();
         if (count === 0) {
             await User.create([
-                { username: 'admin', password: '123', name: 'المدير', role: 'admin' },
-                { username: 'user', password: '123', name: 'موظف', role: 'employee' }
+                { username: 'admin', password: '123', name: 'المدير العام', role: 'admin' },
+                { username: 'user', password: '123', name: 'موظف تجريبي', role: 'employee' }
             ]);
-            res.send('Users Created!');
+            res.send('✅ System Setup Complete! Users Created.');
         } else {
-            res.send('Users Exist');
+            res.send('ℹ️ System already setup.');
         }
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
